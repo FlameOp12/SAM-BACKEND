@@ -6,7 +6,8 @@ from datetime import datetime
 import pytz
 
 app = Flask(__name__)
-CORS(app)
+
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
 scope = [
     "https://spreadsheets.google.com/feeds",
