@@ -7,7 +7,7 @@ import pytz
 
 app = Flask(__name__)
 
-CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+CORS(app, resources={r"/*": {"origins": ["http://*", "https://*"]}}, supports_credentials=True)
 
 scope = [
     "https://spreadsheets.google.com/feeds",
