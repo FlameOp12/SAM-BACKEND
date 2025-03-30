@@ -18,10 +18,10 @@ client = gspread.authorize(creds)
 
 requests_sheet = client.open("Leave_record").worksheet("Sheet6")
 login_sheet = client.open("Leave_record").worksheet('Records')
+done_sheet = client.open("Leave_record").worksheet("Sheet9")
 tz = pytz.timezone('Asia/Kolkata')
 
 #STUDENT
-
 def check_date_overlap(roll_number, new_out_date, new_in_date):
     existing_requests = [
         record for record in requests_sheet.get_all_records()
@@ -66,7 +66,7 @@ def get_requests(roll_number):
 @app.route('/past_requests/<roll_number>', methods=['GET'])
 def get_past_requests(roll_number):
     #print(roll_number)
-    records = requests_sheet.get_all_records()
+    records = done_sheet.get_all_records()
     #print(records)
     filtered_requests = [
         {
@@ -331,21 +331,22 @@ def get_student():
         })
 
     return jsonify(response)
-from datetime import datetime
-from flask import jsonify, request
 
 @app.route('/update_status', methods=['POST'])
 def update_status():
     data = request.json
     request_id = data.get('request_id')
     roll_number = data.get('roll_number')
-    action = data.get('action').upper()
-    
+    action = data.get('action', '').upper()
+
+    if not request_id or not roll_number or not action:
+        return jsonify({'error': 'Missing required fields'}), 400
+
     records = requests_sheet.get_all_records()
     row_idx = next((i for i, rec in enumerate(records) 
                    if str(rec.get('RollNumber', '')).strip().upper() == roll_number 
-            and str(rec.get('RequestID', '')).strip() == request_id 
-            and str(rec.get('Status', '')).strip().upper() != 'DONE'), None)
+                   and str(rec.get('RequestID', '')).strip() == request_id 
+                   and str(rec.get('Status', '')).strip().upper() != 'DONE'), None)
     
     if row_idx is None:
         return jsonify({'error': 'Student not found'}), 404
@@ -359,15 +360,195 @@ def update_status():
     formatted_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
     formatted_date = current_time.strftime("%d/%m/%Y")
 
-    if action == 'OUT':
-        requests_sheet.update_cell(row_idx + 2, out_time_col, formatted_time)
-        requests_sheet.update_cell(row_idx + 2, status_col, 'IN')
-    elif action == 'IN':
-        requests_sheet.update_cell(row_idx + 2, in_time_col, formatted_time)
-        requests_sheet.update_cell(row_idx + 2, in_date_col, formatted_date)
-        requests_sheet.update_cell(row_idx + 2, status_col, 'DONE')
+    try: 
+        if action == 'OUT':
+            requests_sheet.update_cell(row_idx + 2, out_time_col, formatted_time)
+            requests_sheet.update_cell(row_idx + 2, status_col, 'IN')
+        elif action == 'IN':
+            requests_sheet.update_cell(row_idx + 2, in_time_col, formatted_time)
+            requests_sheet.update_cell(row_idx + 2, in_date_col, formatted_date)
+            requests_sheet.update_cell(row_idx + 2, status_col, 'DONE')
 
-    return jsonify({'success': True})
+            row_data = requests_sheet.row_values(row_idx + 2)
+            #print(f"Row data to move: {row_data}")
+            done_sheet.append_row(row_data)
+
+            requests_sheet.delete_rows(row_idx + 2)
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"Error occurred: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+#WARDEN
+@app.route('/get_local', methods=['POST'])
+def get_local():
+    try:
+        # Fetch all rows from the sheet
+        records = requests_sheet.get_all_records()
+
+        # Get the current date
+        current_date = datetime.now().strftime('%d/%m/%Y')
+
+        # Filter records where L/O = "L", InDate < current date, and InTime is blank
+        filtered_requests = []
+        for idx, record in enumerate(records):
+            in_date = record.get('InDate', '').strip()
+            in_time = record.get('InTime', '').strip()
+
+            # Convert date format properly (skip invalid dates)
+            try:
+                in_date_obj = datetime.strptime(in_date, '%d/%m/%Y') if in_date else None
+                current_date_obj = datetime.strptime(current_date, '%d/%m/%Y')
+            except ValueError:
+                continue  # Skip rows with invalid date format
+
+            if record.get('L/O') == 'L' and in_date_obj and in_date_obj < current_date_obj and not in_time:
+                filtered_requests.append({
+                    "RequestID": record['RequestID'],  # Row number (idx starts at 0, header is row 1)
+                    "RollNumber": record['RollNumber'],
+                    "Name": record['Name'],
+                    "Batch": record['Batch'],
+                    "HostelName": record['HostelName'],
+                    "L/O": record['L/O'],
+                    "OutDate": record['OutDate'],
+                    "InDate": record['InDate'],
+                    "Phone Number":record['Phone Number'],
+                    "OutTime":record['OutTime']
+
+                })
+
+        return jsonify({'requests': filtered_requests}), 200
+    except Exception as e:
+        return jsonify({'error': f'An error occurred: {str(e)}'}), 500
+
+@app.route('/get_outstation', methods=['POST'])
+def get_outstation():
+    try:
+        # Fetch all rows from the sheet
+        records = requests_sheet.get_all_records()
+
+        # Get the current date
+        current_date = datetime.now().strftime('%d/%m/%Y')
+
+        # Filter records where L/O = "L", InDate < current date, and InTime is blank
+        filtered_requests = []
+        for idx, record in enumerate(records):
+            in_date = record.get('InDate', '').strip()
+            in_time = record.get('InTime', '').strip()
+
+            # Convert date format properly (skip invalid dates)
+            try:
+                in_date_obj = datetime.strptime(in_date, '%d/%m/%Y') if in_date else None
+                current_date_obj = datetime.strptime(current_date, '%d/%m/%Y')
+            except ValueError:
+                continue  # Skip rows with invalid date format
+
+            if record.get('L/O') == 'O' and in_date_obj and in_date_obj < current_date_obj and not in_time:
+                filtered_requests.append({
+                    "RequestID": record['RequestID'],  # Row number (idx starts at 0, header is row 1)
+                    "RollNumber": record['RollNumber'],
+                    "Name": record['Name'],
+                    "Batch": record['Batch'],
+                    "HostelName": record['HostelName'],
+                    "L/O": record['L/O'],
+                    "OutDate": record['OutDate'],
+                    "InDate": record['InDate'],
+                    "Locality/Area": record['Locality/Area'],
+                    "City":record['City'],
+                    "State":record['State'],
+                    "Reason": record['Reason'],
+                    "Phone Number":record['Phone Number'],
+                    "Alt. Phone Number":record['Alt. Phone Number'],
+                    "Documents":record['Documents'],
+                    "OutTime":record['OutTime']
+                })
+
+        return jsonify({'requests': filtered_requests}), 200
+    except Exception as e:
+        return jsonify({'error': f'An error occurred: {str(e)}'}), 500
+    
+@app.route('/get_rollnumberwise', methods=['POST'])
+def get_rollnumberwise():
+    try:
+        # Parse JSON request data
+        data = request.get_json()
+        roll_number = data.get('rollNumber', '').strip().upper()
+        print(roll_number)
+
+        if not roll_number:
+            return jsonify({'error': 'Roll Number is required.'}), 400
+
+        # Fetch all rows from the records_sheet
+        records = login_sheet.get_all_records()
+       #print(records)
+        matched_record = next(
+            (record for record in records if str(record.get('Roll Number (New Roll Number)')).strip().upper() == roll_number), None
+        )
+
+        #print(matched_record)
+
+        if not matched_record:
+            return jsonify({'error': 'No record found for the entered Roll Number in records_sheet.'}), 404
+
+        # Extract personal details
+        personal_details = {
+            "RollNumber": matched_record.get('Roll Number (New Roll Number)', ''),
+            "Name": matched_record.get('Full Name', ''),
+            "Batch": matched_record.get('Batch', ''),
+            "HostelName": matched_record.get('Hostel Name', '')
+        }
+
+
+        # Fetch all rows from the request_sheet
+        requests = done_sheet.get_all_records()
+        filtered_requests = []
+
+        # Filter and process L/O details
+        for record in requests:
+            if record.get('RollNumber') == roll_number:
+                lo_type = record.get('L/O').strip()
+                if lo_type == 'L':
+                    filtered_requests.append({
+                        "RequestID": record['RequestID'],
+                        "L/O": lo_type,
+                        "OutDate": record['OutDate'],
+                        "InDate": record['InDate'],
+                        "Phone Number": record.get('Phone Number', ''),
+                        "OutTime": record.get('OutTime', ''),
+                        "InTime": record.get('InTime', ''),
+                        "Status": record.get('Status', '')
+                    })
+                elif lo_type == 'O':
+                    filtered_requests.append({
+                        "RequestID": record['RequestID'],
+                        "L/O": lo_type,
+                        "OutDate": record['OutDate'],
+                        "InDate": record['InDate'],
+                        "Locality/Area": record.get('Locality/Area', ''),
+                        "City": record.get('City', ''),
+                        "State": record.get('State', ''),
+                        "Reason": record.get('Reason', ''),
+                        "Phone Number": record.get('Phone Number', ''),
+                        "Alt. Phone Number": record.get('Alt. Phone Number', ''),
+                        "Documents": record.get('Documents', ''),
+                        "OutTime": record.get('OutTime', ''),
+                        "InTime": record.get('InTime', ''),
+                        "Status": record.get('Status', '')
+                    })
+
+        # Combine personal details and requests
+        response = {
+            "personalDetails": personal_details,
+            "requests": filtered_requests
+        }
+
+        return jsonify(response), 200
+
+    except Exception as e:
+        return jsonify({'error': f'An error occurred: {str(e)}'}), 500
+
 
 
 if __name__ == '__main__':
