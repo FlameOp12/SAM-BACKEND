@@ -115,6 +115,7 @@ def student_details(roll_number):
 
 @app.route('/new_request_local', methods=['POST'])
 def new_request_local():
+    global last_request_id 
     data = request.get_json()
     roll_number = data.get('RollNumber')
     name = data.get('Name')
@@ -190,6 +191,7 @@ def new_request_local():
 
 @app.route('/new_request_outstation', methods=['POST'])
 def new_request_outstation():
+    global last_request_id 
     data = request.get_json()
     roll_number = data.get('RollNumber')
     name = data.get('Name')
