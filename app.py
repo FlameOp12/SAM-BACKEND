@@ -22,6 +22,9 @@ done_sheet = client.open("Leave_record").worksheet("Sheet9")
 tz = pytz.timezone('Asia/Kolkata')
 
 #STUDENT
+
+last_request_id=0
+
 def check_date_overlap(roll_number, new_out_date, new_in_date):
     existing_requests = [
         record for record in requests_sheet.get_all_records()
@@ -158,8 +161,9 @@ def new_request_local():
         if str(record.get("RollNumber")) == roll_number and record.get("L/O") == "L" and record.get("Status", "").strip().upper() == "OUT":
             return jsonify({'success': False, 'message': 'You already have an active Single day outing request'}), 400
 
-    last_request_id = int(records[-1]['RequestID']) if records else 0
+    #last_request_id = int(records[-1]['RequestID']) if records else 0
     new_request_id = last_request_id + 1
+    last_request_id=new_request_id
 
     requests_sheet.append_row([
         new_request_id,
@@ -226,8 +230,9 @@ def new_request_outstation():
         if str(record.get("RollNumber")) == roll_number and record.get("L/O") == "O" and record.get("Status", "").strip().upper() == "OUT":
             return jsonify({'success': False, 'message': 'You already have an active Multiple days outing request'}), 400
 
-    last_request_id = int(records[-1]['RequestID']) if records else 0
+    # last_request_id = int(records[-1]['RequestID']) if records else 0
     new_request_id = last_request_id + 1
+    last_request_id=new_request_id
 
     requests_sheet.append_row([
         new_request_id,
