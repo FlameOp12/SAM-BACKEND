@@ -278,31 +278,27 @@ def update_in_date():
     try:
         data = request.json
         request_id = data.get('request_id')
-        roll_number = data.get('roll_number')
-        new_in_date = data.get('in_date')  # Expected format: "DD/MM/YYYY"
+        new_in_date = data.get('in_date') 
 
-        if not request_id or not roll_number or not new_in_date:
+        if not request_id  or not new_in_date:
             return jsonify({'error': 'Missing required fields'}), 400
 
         records = requests_sheet.get_all_records()
         row_idx = next(
             (i for i, rec in enumerate(records) 
-             if str(rec.get('RollNumber', '')).strip().upper() == roll_number.upper() 
-             and str(rec.get('RequestID', '')).strip() == request_id), 
+             if (rec.get('RequestID', '')) == request_id), 
             None
         )
 
         if row_idx is None:
             return jsonify({'error': 'Request not found'}), 404
 
-        in_date_col = 8  # Column index for "In Date"
-
-        # Update the In Date column
+        in_date_col = 8 
         requests_sheet.update_cell(row_idx + 2, in_date_col, new_in_date)  # Ensure correct row index
 
         return jsonify({'success': True, 'message': 'In Date updated successfully'})
     except Exception as e:
-        print(f"Error occurred: {e}")
+        #print(f"Error occurred: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
 #GUARD
@@ -310,16 +306,20 @@ def update_in_date():
 def get_student():
     data = request.json
     roll_number = data.get('roll_number', '').strip().upper()
-   # print(roll_number)
-
+    #print(roll_number)
+    
+    # Convert 'O' to '0' in roll_number
+    if 'O' in roll_number:
+        roll_number = roll_number.replace('O', '0')
+        #print(roll_number)
+    
     records = requests_sheet.get_all_records()
 
     students = [
         rec for rec in records 
-        if str(rec.get('RollNumber', '')) == roll_number
+        if str(rec.get('RollNumber', '')).strip() == roll_number
         and str(rec.get('Status', '')).strip().upper() != 'DONE'
     ]
-
     #print(students)
 
     if not students:
@@ -369,6 +369,10 @@ def update_status():
     request_id = data.get('request_id')
     roll_number = data.get('roll_number')
     action = data.get('action', '').upper()
+    
+    # Convert 'O' to '0' in roll_number
+    if roll_number:
+        roll_number = roll_number.strip().upper().replace('O', '0')
 
     if not request_id or not roll_number or not action:
         return jsonify({'error': 'Missing required fields'}), 400
@@ -401,16 +405,14 @@ def update_status():
             requests_sheet.update_cell(row_idx + 2, status_col, 'DONE')
 
             row_data = requests_sheet.row_values(row_idx + 2)
-            #print(f"Row data to move: {row_data}")
             done_sheet.append_row(row_data)
 
             requests_sheet.delete_rows(row_idx + 2)
         
         return jsonify({'success': True})
     except Exception as e:
-        print(f"Error occurred: {e}")
+        #print(f"Error occurred: {e}")
         return jsonify({'error': 'Internal server error'}), 500
-
 
 #WARDEN
 @app.route('/get_local', methods=['POST'])
