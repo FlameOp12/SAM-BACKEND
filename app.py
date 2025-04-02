@@ -22,9 +22,6 @@ done_sheet = client.open("Leave_record").worksheet("Sheet9")
 tz = pytz.timezone('Asia/Kolkata')
 
 #STUDENT
-
-last_request_id=0
-
 def check_date_overlap(roll_number, new_out_date, new_in_date):
     existing_requests = [
         record for record in requests_sheet.get_all_records()
@@ -95,7 +92,7 @@ def get_past_requests(roll_number):
 
 @app.route('/student_details/<roll_number>', methods=['GET'])
 def student_details(roll_number):
-    print(roll_number)
+    #print(roll_number)
     records = login_sheet.get_all_records()
     filtered_requests = [
         {
@@ -115,7 +112,6 @@ def student_details(roll_number):
 
 @app.route('/new_request_local', methods=['POST'])
 def new_request_local():
-    global last_request_id 
     data = request.get_json()
     roll_number = data.get('RollNumber')
     name = data.get('Name')
@@ -162,9 +158,8 @@ def new_request_local():
         if str(record.get("RollNumber")) == roll_number and record.get("L/O") == "L" and record.get("Status", "").strip().upper() == "OUT":
             return jsonify({'success': False, 'message': 'You already have an active Single day outing request'}), 400
 
-    #last_request_id = int(records[-1]['RequestID']) if records else 0
+    last_request_id = int(records[-1]['RequestID']) if records else 0
     new_request_id = last_request_id + 1
-    last_request_id=new_request_id
 
     requests_sheet.append_row([
         new_request_id,
@@ -191,7 +186,6 @@ def new_request_local():
 
 @app.route('/new_request_outstation', methods=['POST'])
 def new_request_outstation():
-    global last_request_id 
     data = request.get_json()
     roll_number = data.get('RollNumber')
     name = data.get('Name')
@@ -232,9 +226,8 @@ def new_request_outstation():
         if str(record.get("RollNumber")) == roll_number and record.get("L/O") == "O" and record.get("Status", "").strip().upper() == "OUT":
             return jsonify({'success': False, 'message': 'You already have an active Multiple days outing request'}), 400
 
-    # last_request_id = int(records[-1]['RequestID']) if records else 0
+    last_request_id = int(records[-1]['RequestID']) if records else 0
     new_request_id = last_request_id + 1
-    last_request_id=new_request_id
 
     requests_sheet.append_row([
         new_request_id,
@@ -286,7 +279,7 @@ def delete_request(request_id):
 def get_student():
     data = request.json
     roll_number = data.get('roll_number', '').strip().upper()
-    print(roll_number)
+   # print(roll_number)
 
     records = requests_sheet.get_all_records()
 
@@ -296,7 +289,7 @@ def get_student():
         and str(rec.get('Status', '')).strip().upper() != 'DONE'
     ]
 
-    print(students)
+    #print(students)
 
     if not students:
         return jsonify({'error': 'Student not found or all requests are completed'}), 404
@@ -482,7 +475,7 @@ def get_rollnumberwise():
         # Parse JSON request data
         data = request.get_json()
         roll_number = data.get('rollNumber', '').strip().upper()
-        print(roll_number)
+       # print(roll_number)
 
         if not roll_number:
             return jsonify({'error': 'Roll Number is required.'}), 400
