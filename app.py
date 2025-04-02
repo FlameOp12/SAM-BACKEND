@@ -272,7 +272,38 @@ def delete_request(request_id):
     except Exception as e:
         #print(f"Error deleting request: {e}")
         return jsonify({'success': False, 'message': 'An error occurred while deleting the request'}), 500
-    
+
+@app.route('/update_in_date', methods=['POST'])
+def update_in_date():
+    try:
+        data = request.json
+        request_id = data.get('request_id')
+        roll_number = data.get('roll_number')
+        new_in_date = data.get('in_date')  # Expected format: "DD/MM/YYYY"
+
+        if not request_id or not roll_number or not new_in_date:
+            return jsonify({'error': 'Missing required fields'}), 400
+
+        records = requests_sheet.get_all_records()
+        row_idx = next(
+            (i for i, rec in enumerate(records) 
+             if str(rec.get('RollNumber', '')).strip().upper() == roll_number.upper() 
+             and str(rec.get('RequestID', '')).strip() == request_id), 
+            None
+        )
+
+        if row_idx is None:
+            return jsonify({'error': 'Request not found'}), 404
+
+        in_date_col = 8  # Column index for "In Date"
+
+        # Update the In Date column
+        requests_sheet.update_cell(row_idx + 2, in_date_col, new_in_date)  # Ensure correct row index
+
+        return jsonify({'success': True, 'message': 'In Date updated successfully'})
+    except Exception as e:
+        print(f"Error occurred: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 #GUARD
 @app.route('/get_student', methods=['POST'])
