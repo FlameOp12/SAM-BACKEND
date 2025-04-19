@@ -16,9 +16,9 @@ scope = [
 creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
 client = gspread.authorize(creds)
 
-requests_sheet = client.open("Leave_record").worksheet("Sheet6")
-login_sheet = client.open("Leave_record").worksheet('Records')
-done_sheet = client.open("Leave_record").worksheet("Sheet9")
+requests_sheet = client.open("StudentRecords_SAM").worksheet("Active_Records")
+login_sheet = client.open("StudentRecords_SAM").worksheet('Student_Data')
+done_sheet = client.open("StudentRecords_SAM").worksheet("Past_Records")
 tz = pytz.timezone('Asia/Kolkata')
 
 #STUDENT
@@ -99,7 +99,7 @@ def student_details(roll_number):
             'RollNumber': str(record.get("Roll Number (New Roll Number)", "")).strip().upper(),
             'Name': str(record.get("Full Name", "")),
             'Batch': str(record.get("Batch", "")),
-            'HostelName': str(record.get("Hostel Name", ""))
+            #'HostelName': str(record.get("Hostel Name", ""))
         }
         for record in records
         if str(record.get("Old Roll Number")).strip().upper() == str(roll_number).upper()
@@ -116,7 +116,7 @@ def new_request_local():
     roll_number = data.get('RollNumber')
     name = data.get('Name')
     batch = data.get('Batch')
-    hostel_name = data.get('HostelName')
+    #hostel_name = data.get('HostelName')
     local_outstation = data.get('L/O')
     out_date = data.get('OutDate')
     in_date = data.get('InDate')
@@ -139,7 +139,7 @@ def new_request_local():
     #     if str(record.get("RollNumber")) == roll_number and record.get("L/O") == "L" and record.get("Status", "").strip().upper() == "OUT":
     #         return jsonify({'success': False, 'message': 'You already have an active Single day outing request'}), 400
 
-    required_fields = [roll_number, name, batch, hostel_name, out_date, in_date]
+    required_fields = [roll_number, name, batch, out_date, in_date]
     if not all(required_fields):
         return jsonify({'success': False, 'message': 'Please fill in all required fields'}), 400
 
@@ -166,7 +166,7 @@ def new_request_local():
         roll_number,
         name,
         batch,
-        hostel_name,
+        #hostel_name,
         local_outstation,
         out_date,
         in_date,
@@ -190,7 +190,7 @@ def new_request_outstation():
     roll_number = data.get('RollNumber')
     name = data.get('Name')
     batch = data.get('Batch')
-    hostel_name = data.get('HostelName')
+    #hostel_name = data.get('HostelName')
     local_outstation = data.get('L/O')
     out_date = data.get('OutDate')
     in_date = data.get('InDate')
@@ -208,7 +208,7 @@ def new_request_outstation():
     # if not roll_number or not name or not batch or not hostel_name or not out_date or not in_date or not locality_area or not city or not state or not reason or not ph_number:
     #     return jsonify({'success': False, 'message': 'Please fill in all required fields'}), 400
 
-    required_fields = [roll_number, name, batch, hostel_name, out_date, in_date, locality_area, city, state, reason, ph_number]
+    required_fields = [roll_number, name, batch, out_date, in_date, locality_area, city, state, reason, ph_number]
     if not all(required_fields):
         return jsonify({'success': False, 'message': 'Please fill in all required fields'}), 400
 
@@ -234,7 +234,7 @@ def new_request_outstation():
         roll_number,
         name,
         batch,
-        hostel_name,
+        #hostel_name,
         local_outstation,
         out_date,
         in_date,
@@ -293,7 +293,7 @@ def update_in_date():
         if row_idx is None:
             return jsonify({'error': 'Request not found'}), 404
 
-        in_date_col = 8 
+        in_date_col = 7
         requests_sheet.update_cell(row_idx + 2, in_date_col, new_in_date)  # Ensure correct row index
 
         return jsonify({'success': True, 'message': 'In Date updated successfully'})
@@ -386,10 +386,10 @@ def update_status():
     if row_idx is None:
         return jsonify({'error': 'Student not found'}), 404
 
-    status_col = 16  
-    out_time_col = 17  
-    in_time_col = 18  
-    in_date_col = 8  
+    status_col = 15  
+    out_time_col = 16 
+    in_time_col = 17
+    in_date_col = 7  
 
     current_time = datetime.now(tz)
     formatted_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
@@ -443,7 +443,7 @@ def get_local():
                     "RollNumber": record['RollNumber'],
                     "Name": record['Name'],
                     "Batch": record['Batch'],
-                    "HostelName": record['HostelName'],
+                    #"HostelName": record['HostelName'],
                     "L/O": record['L/O'],
                     "OutDate": record['OutDate'],
                     "InDate": record['InDate'],
@@ -484,7 +484,7 @@ def get_outstation():
                     "RollNumber": record['RollNumber'],
                     "Name": record['Name'],
                     "Batch": record['Batch'],
-                    "HostelName": record['HostelName'],
+                    #"HostelName": record['HostelName'],
                     "L/O": record['L/O'],
                     "OutDate": record['OutDate'],
                     "InDate": record['InDate'],
@@ -530,7 +530,7 @@ def get_rollnumberwise():
             "RollNumber": matched_record.get('Roll Number (New Roll Number)', ''),
             "Name": matched_record.get('Full Name', ''),
             "Batch": matched_record.get('Batch', ''),
-            "HostelName": matched_record.get('Hostel Name', '')
+            #"HostelName": matched_record.get('Hostel Name', '')
         }
 
 
