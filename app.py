@@ -155,7 +155,7 @@ def new_request_local():
     records = requests_sheet.get_all_records()
 
     for record in records:
-        if str(record.get("RollNumber")) == roll_number and record.get("L/O") == "L" and record.get("Status", "").strip().upper() == "OUT":
+        if str(record.get("RollNumber")) == roll_number and record.get("L/O") == "L":
             return jsonify({'success': False, 'message': 'You already have an active Single day outing request'}), 400
 
     last_request_id = int(records[-1]['RequestID']) if records else 0
@@ -208,7 +208,7 @@ def new_request_outstation():
     # if not roll_number or not name or not batch or not hostel_name or not out_date or not in_date or not locality_area or not city or not state or not reason or not ph_number:
     #     return jsonify({'success': False, 'message': 'Please fill in all required fields'}), 400
 
-    required_fields = [roll_number, name, batch, out_date, in_date, locality_area, city, state, reason, ph_number]
+    required_fields = [roll_number, name, batch, out_date, in_date, locality_area, city, state, reason, ph_number, alt_ph_number]
     if not all(required_fields):
         return jsonify({'success': False, 'message': 'Please fill in all required fields'}), 400
 
@@ -223,7 +223,7 @@ def new_request_outstation():
     
     records = requests_sheet.get_all_records()
     for record in records:
-        if str(record.get("RollNumber")) == roll_number and record.get("L/O") == "O" and record.get("Status", "").strip().upper() == "OUT":
+        if str(record.get("RollNumber")) == roll_number and record.get("L/O") == "O":
             return jsonify({'success': False, 'message': 'You already have an active Multiple days outing request'}), 400
 
     last_request_id = int(records[-1]['RequestID']) if records else 0
@@ -273,7 +273,7 @@ def delete_request(request_id):
         #print(f"Error deleting request: {e}")
         return jsonify({'success': False, 'message': 'An error occurred while deleting the request'}), 500
 
-@app.route('/update_in_date', methods=['POST'])
+@app.route('/update_in_date_multiple', methods=['POST'])
 def update_in_date():
     try:
         data = request.json
@@ -297,6 +297,93 @@ def update_in_date():
         requests_sheet.update_cell(row_idx + 2, in_date_col, new_in_date)  # Ensure correct row index
 
         return jsonify({'success': True, 'message': 'In Date updated successfully'})
+    except Exception as e:
+        #print(f"Error occurred: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/check_in_date_single', methods=['POST'])
+def check_in_date_single():
+    try:
+        data = request.get_json()
+        roll_number = data.get('roll_number')
+        print(f"Received RollNumber: {roll_number}")
+
+        if not roll_number:
+            return jsonify({'success': False, 'message': 'RollNumber is missing'}), 400
+
+        records = requests_sheet.get_all_records()
+        #print(records)
+        for record in records:
+            if str(record.get("RollNumber")) == str(roll_number) and record.get("L/O") == "O":
+                return jsonify({'success': False, 'message': 'You already have an active Multiple days outing request. Delete the Multiple days outing request and try again.'}), 400
+
+        # If no active multiple days outing request is found, return success
+        return jsonify({'success': True, 'message': 'No active multiple days outing request found'}), 200
+
+    except Exception as e:
+        #print(f"Error occurred: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/update_in_date_single', methods=['POST'])
+def update_request():
+    try:
+        data = request.json
+        request_id = data.get('request_id')
+        new_in_date_str = data.get('in_date')  # Ensure correct key
+        locality_area = data.get('locality')
+        city = data.get('city')
+        state = data.get('state')
+        reason = data.get('reason')
+        phone_number = data.get('phone_number')
+        alt_phone_number = data.get('alternate_phone')
+        documents = data.get('documents')
+
+        # print(request_id)
+        # print(new_in_date_str)
+
+        required_fields = [request_id, new_in_date_str, locality_area, city, state, reason, phone_number, alt_phone_number]
+        if not all(required_fields):
+            return jsonify({'success': False, 'message': 'Please fill in all required fields'}), 400
+
+        # Parse the date string to a datetime object
+        try:
+            new_in_date = datetime.strptime(new_in_date_str, '%d/%m/%Y')
+        except ValueError:
+            return jsonify({'error': 'Invalid date format. Expected dd/MM/yyyy'}), 400
+
+        records = requests_sheet.get_all_records()
+        row_idx = next(
+            (i for i, rec in enumerate(records) 
+             if (rec.get('RequestID', '')) == request_id), 
+            None
+        )
+
+        if row_idx is None:
+            return jsonify({'error': 'Request not found'}), 404
+
+        # Define column indices based on your sheet structure
+        status_col = 5
+        in_date_col = 7
+        locality_area_col = 8
+        city_col = 9
+        state_col = 10
+        reason_col = 11
+        phone_number_col = 12
+        alt_phone_number_col = 13
+        documents_col = 14
+
+        # Update the cells
+        requests_sheet.update_cell(row_idx + 2, status_col, "O")
+        requests_sheet.update_cell(row_idx + 2, in_date_col, new_in_date_str)  # Use the string directly
+        requests_sheet.update_cell(row_idx + 2, locality_area_col, locality_area)
+        requests_sheet.update_cell(row_idx + 2, city_col, city)
+        requests_sheet.update_cell(row_idx + 2, state_col, state)
+        requests_sheet.update_cell(row_idx + 2, reason_col, reason)
+        requests_sheet.update_cell(row_idx + 2, phone_number_col, phone_number)
+        requests_sheet.update_cell(row_idx + 2, alt_phone_number_col, alt_phone_number)
+        requests_sheet.update_cell(row_idx + 2, documents_col, documents)
+
+        return jsonify({'success': True, 'message': 'Request updated successfully'})
     except Exception as e:
         #print(f"Error occurred: {e}")
         return jsonify({'error': 'Internal server error'}), 500
@@ -338,6 +425,7 @@ def get_student():
         )
 
     student = students[0]
+    #print(student)
 
     is_local = student.get('L/O', '').strip().upper() == 'L'
     is_outstation = student.get('L/O', '').strip().upper() == 'O'
