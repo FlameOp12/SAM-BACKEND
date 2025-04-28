@@ -4,6 +4,10 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 import pytz
+import hmac
+import hashlib
+import json
+
 
 app = Flask(__name__)
 
@@ -21,7 +25,29 @@ login_sheet = client.open("StudentRecords_SAM").worksheet('Student_Data')
 done_sheet = client.open("StudentRecords_SAM").worksheet("Past_Records")
 tz = pytz.timezone('Asia/Kolkata')
 
-#STUDENT
+SECRET_KEY="1e8c0859a23047974ffdb4b0bdec79879fb96dd2943d1bf93ba05d42427c006b"
+
+
+#student
+def generate_server_signature():
+    """Generate server-side HMAC signature using only the secret key."""
+    return hmac.new(SECRET_KEY.encode('utf-8'), SECRET_KEY.encode('utf-8'), hashlib.sha256).hexdigest()
+
+def verify_request_signature():
+    """Verify the request's Authorization signature using the secret key."""
+    received_signature = request.headers.get('Authorization', '').replace('Bearer ', '').strip()
+    print("received signature: ", received_signature)
+
+    if not received_signature:
+        return jsonify({'success': False, 'message': 'Out of your scope'}), 401
+
+    expected_signature = generate_server_signature()
+    print("expected signature: ", expected_signature)
+
+    if not hmac.compare_digest(received_signature, expected_signature):
+        return jsonify({'success': False, 'message': 'Invalid Signature'}), 401
+
+    return None  # Means verification passed
 def check_date_overlap(roll_number, new_out_date, new_in_date):
     existing_requests = [
         record for record in requests_sheet.get_all_records()
@@ -40,6 +66,10 @@ def check_date_overlap(roll_number, new_out_date, new_in_date):
 
 @app.route('/requests/<roll_number>', methods=['GET'])
 def get_requests(roll_number):
+    verification_response = verify_request_signature()
+    if verification_response:
+        return verification_response 
+    
     records = requests_sheet.get_all_records()
     filtered_requests = [
         {
@@ -66,6 +96,10 @@ def get_requests(roll_number):
 @app.route('/past_requests/<roll_number>', methods=['GET'])
 def get_past_requests(roll_number):
     #print(roll_number)
+    verification_response = verify_request_signature()
+    if verification_response:
+        return verification_response 
+    
     records = done_sheet.get_all_records()
     #print(records)
     filtered_requests = [
@@ -92,6 +126,10 @@ def get_past_requests(roll_number):
 
 @app.route('/student_details/<roll_number>', methods=['GET'])
 def student_details(roll_number):
+    verification_response = verify_request_signature()
+    if verification_response:
+        return verification_response 
+    
     #print(roll_number)
     records = login_sheet.get_all_records()
     filtered_requests = [
@@ -112,7 +150,12 @@ def student_details(roll_number):
 
 @app.route('/new_request_local', methods=['POST'])
 def new_request_local():
-    data = request.get_json()
+    data = request.get_json()   
+     # Step 1: Verify Signature
+    verification_response = verify_request_signature()
+    if verification_response:
+        return verification_response  
+
     roll_number = data.get('RollNumber')
     name = data.get('Name')
     batch = data.get('Batch')
@@ -187,6 +230,10 @@ def new_request_local():
 @app.route('/new_request_outstation', methods=['POST'])
 def new_request_outstation():
     data = request.get_json()
+    verification_response = verify_request_signature()
+    if verification_response:
+        return verification_response 
+    
     roll_number = data.get('RollNumber')
     name = data.get('Name')
     batch = data.get('Batch')
@@ -254,7 +301,11 @@ def new_request_outstation():
 
 @app.route('/delete_request/<int:request_id>', methods=['DELETE'])
 def delete_request(request_id):
-    try:
+    verification_response = verify_request_signature()
+    if verification_response:
+        return verification_response 
+    
+    try:      
         records = requests_sheet.get_all_records()
 
         row_index = None
@@ -277,6 +328,10 @@ def delete_request(request_id):
 def update_in_date():
     try:
         data = request.json
+        verification_response = verify_request_signature()
+        if verification_response:
+            return verification_response 
+    
         request_id = data.get('request_id')
         new_in_date = data.get('in_date') 
 
@@ -305,6 +360,10 @@ def update_in_date():
 def check_in_date_single():
     try:
         data = request.get_json()
+        verification_response = verify_request_signature()
+        if verification_response:
+            return verification_response 
+        
         roll_number = data.get('roll_number')
         print(f"Received RollNumber: {roll_number}")
 
@@ -328,6 +387,9 @@ def check_in_date_single():
 def update_request():
     try:
         data = request.json
+        verification_response = verify_request_signature()
+        if verification_response:
+            return verification_response 
         request_id = data.get('request_id')
         new_in_date_str = data.get('in_date')  # Ensure correct key
         locality_area = data.get('locality')
