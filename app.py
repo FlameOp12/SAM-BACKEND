@@ -9,7 +9,7 @@ import hashlib
 import json
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-
+import logging
 
 app = Flask(__name__)
 
@@ -29,12 +29,20 @@ tz = pytz.timezone('Asia/Kolkata')
 
 SECRET_KEY="1e8c0859a23047974ffdb4b0bdec79879fb96dd2943d1bf93ba05d42427c006b"
 
-# Define a middleware function to log IP addresses
-def log_ip_address(app):
-    @app.before_request
-    def log_client_ip():
-        client_ip = request.remote_addr
-        print(f"Client IP Address: {client_ip}")
+
+logging.basicConfig(level=logging.INFO)
+
+@app.before_request
+def log_client_ip():
+    client_ip = request.remote_addr
+    logging.info(f"Client IP Address: {client_ip}")
+
+# # Define a middleware function to log IP addresses
+# def log_ip_address(app):
+#     @app.before_request
+#     def log_client_ip():
+#         client_ip = request.remote_addr
+#         print(f"Client IP Address: {client_ip}")
 
 # Apply the middleware to your Flask app
 log_ip_address(app)
