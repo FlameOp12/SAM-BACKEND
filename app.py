@@ -7,6 +7,8 @@ import pytz
 import hmac
 import hashlib
 import json
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 
 app = Flask(__name__)
@@ -27,7 +29,12 @@ tz = pytz.timezone('Asia/Kolkata')
 
 SECRET_KEY="1e8c0859a23047974ffdb4b0bdec79879fb96dd2943d1bf93ba05d42427c006b"
 
-
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["200 per day"],
+    storage_uri="redis://127.0.0.1:6379/0"  # Localhost since Flask is on the same server
+)
 #student
 def generate_server_signature():
     """Generate server-side HMAC signature using only the secret key."""
@@ -65,6 +72,7 @@ def check_date_overlap(roll_number, new_out_date, new_in_date):
 
 
 @app.route('/requests/<roll_number>', methods=['GET'])
+@limiter.limit("4 per minute")
 def get_requests(roll_number):
     verification_response = verify_request_signature()
     if verification_response:
@@ -94,6 +102,7 @@ def get_requests(roll_number):
     return jsonify(filtered_requests), 200
 
 @app.route('/past_requests/<roll_number>', methods=['GET'])
+@limiter.limit("4 per minute")
 def get_past_requests(roll_number):
     #print(roll_number)
     verification_response = verify_request_signature()
@@ -125,6 +134,7 @@ def get_past_requests(roll_number):
     return jsonify(filtered_requests), 200
 
 @app.route('/student_details/<roll_number>', methods=['GET'])
+@limiter.limit("4 per minute")
 def student_details(roll_number):
     verification_response = verify_request_signature()
     if verification_response:
@@ -149,6 +159,7 @@ def student_details(roll_number):
     return jsonify({'success': False, 'message': 'Student not found'}), 404
 
 @app.route('/new_request_local', methods=['POST'])
+@limiter.limit("4 per minute")
 def new_request_local():
     data = request.get_json()   
      # Step 1: Verify Signature
@@ -228,6 +239,7 @@ def new_request_local():
     return jsonify({'success': True, 'message': 'Request submitted successfully', 'RequestID': new_request_id}), 200
 
 @app.route('/new_request_outstation', methods=['POST'])
+@limiter.limit("4 per minute")
 def new_request_outstation():
     data = request.get_json()
     verification_response = verify_request_signature()
@@ -300,6 +312,7 @@ def new_request_outstation():
     return jsonify({'success': True, 'message': 'Request submitted successfully', 'RequestID': new_request_id}), 200
 
 @app.route('/delete_request/<int:request_id>', methods=['DELETE'])
+@limiter.limit("4 per minute")
 def delete_request(request_id):
     verification_response = verify_request_signature()
     if verification_response:
@@ -325,6 +338,7 @@ def delete_request(request_id):
         return jsonify({'success': False, 'message': 'An error occurred while deleting the request'}), 500
 
 @app.route('/update_in_date_multiple', methods=['POST'])
+@limiter.limit("4 per minute")
 def update_in_date():
     try:
         data = request.json
@@ -357,6 +371,7 @@ def update_in_date():
         return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/check_in_date_single', methods=['POST'])
+@limiter.limit("4 per minute")
 def check_in_date_single():
     try:
         data = request.get_json()
@@ -384,6 +399,7 @@ def check_in_date_single():
         return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/update_in_date_single', methods=['POST'])
+@limiter.limit("4 per minute")
 def update_request():
     try:
         data = request.json
