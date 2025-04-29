@@ -45,7 +45,7 @@ def log_client_ip():
 #         print(f"Client IP Address: {client_ip}")
 
 # Apply the middleware to your Flask app
-log_ip_address(app)
+# log_ip_address(app)
 
 limiter = Limiter(
     app=app,
