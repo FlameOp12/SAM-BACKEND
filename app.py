@@ -13,7 +13,7 @@ import logging
 
 app = Flask(__name__)
 
-CORS(app, resources={r"/*": {"origins": ["http://*", "https://*"]}}, supports_credentials=True)
+CORS(app, resources={r"/api/*": {"origins": ["https://sam.iitdh.ac.in"]}}, supports_credentials=True)
 
 scope = [
     "https://spreadsheets.google.com/feeds",
