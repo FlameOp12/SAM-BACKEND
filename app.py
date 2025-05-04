@@ -32,21 +32,29 @@ SECRET_KEY="1e8c0859a23047974ffdb4b0bdec79879fb96dd2943d1bf93ba05d42427c006b"
 
 
 logging.basicConfig(level=logging.INFO)
+app.wsgi_app = ProxyFix(
+    app.wsgi_app,
+    x_for=1,  # Number of proxy servers in front of Flask
+    x_proto=1,  # Number of proxy servers for protocol
+    x_host=1,   # Number of proxy servers for host
+    x_port=1,   # Number of proxy servers for port
+    x_prefix=1  # Number of proxy servers for URL prefix
+)
 
-# @app.before_request
-# def log_client_ip():
-#     client_ip = request.remote_addr
-#     logging.info(f"Client IP Address: {client_ip}")
+@app.before_request
+def log_client_ip():
+    client_ip = request.remote_addr
+    logging.info(f"Client IP Address: {client_ip}")
 
-# # Define a middleware function to log IP addresses
-# def log_ip_address(app):
-#     @app.before_request
-#     def log_client_ip():
-#         client_ip = request.remote_addr
-#         print(f"Client IP Address: {client_ip}")
+# Define a middleware function to log IP addresses
+def log_ip_address(app):
+    @app.before_request
+    def log_client_ip():
+        client_ip = request.remote_addr
+        print(f"Client IP Address: {client_ip}")
 
-# Apply the middleware to your Flask app
-# log_ip_address(app)
+Apply the middleware to your Flask app
+log_ip_address(app)
 
 limiter = Limiter(
     app=app,
