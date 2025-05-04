@@ -45,7 +45,7 @@ app.wsgi_app = ProxyFix(
 @app.before_request
 def log_client_ip():
     client_ip = request.remote_addr
-    logging.info(f"Client IP Address: {client_ip}")
+    # logging.info(f"Client IP Address: {client_ip}")
 
 # Define a middleware function to log IP addresses
 def log_ip_address(app):
