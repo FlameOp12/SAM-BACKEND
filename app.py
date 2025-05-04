@@ -11,6 +11,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import logging
 import base64
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 app = Flask(__name__)
 
