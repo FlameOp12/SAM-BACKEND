@@ -10,10 +10,11 @@ import json
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import logging
+import base64
 
 app = Flask(__name__)
 
-CORS(app, resources={r"/api/*": {"origins": ["https://sam.iitdh.ac.in"]}}, supports_credentials=True)
+CORS(app, resources={r"/*": {"origins": ["http://*", "https://*"]}}, supports_credentials=True)
 
 scope = [
     "https://spreadsheets.google.com/feeds",
@@ -32,10 +33,10 @@ SECRET_KEY="1e8c0859a23047974ffdb4b0bdec79879fb96dd2943d1bf93ba05d42427c006b"
 
 logging.basicConfig(level=logging.INFO)
 
-@app.before_request
-def log_client_ip():
-    client_ip = request.remote_addr
-    logging.info(f"Client IP Address: {client_ip}")
+# @app.before_request
+# def log_client_ip():
+#     client_ip = request.remote_addr
+#     logging.info(f"Client IP Address: {client_ip}")
 
 # # Define a middleware function to log IP addresses
 # def log_ip_address(app):
@@ -53,26 +54,109 @@ limiter = Limiter(
     default_limits=["70 per day"],
     storage_uri="redis://127.0.0.1:6379/0"  # Localhost since Flask is on the same server
 )
-#student
-def generate_server_signature():
-    """Generate server-side HMAC signature using only the secret key."""
-    return hmac.new(SECRET_KEY.encode('utf-8'), SECRET_KEY.encode('utf-8'), hashlib.sha256).hexdigest()
 
-def verify_request_signature():
+#student
+# def decode_signature(encoded_signature, secret_key):
+#     # Step 1: Base64 decoding
+#     # print("Base64 decoding started.")
+#     decoded_bytes = base64.b64decode(encoded_signature)
+#     print(f"Decoded signature base 64: {decoded_bytes}")
+
+#     decoded=decoded_bytes
+
+#     # Step 2: Reverse the XOR transformation
+#     derived_key = sum(ord(c) for c in secret_key) % 256  # Use secret_key to derive key for XOR
+#     print(f"Derived key for XOR: {derived_key}")
+
+#     try:
+#         mixed_bytes = bytearray(decoded_bytes)
+#         mixed_string = ''.join(chr(b ^ derived_key) for b in mixed_bytes)
+#         print(f"Mixed string after XOR: {mixed_string}")
+#     except Exception as e:
+#         print(f"XOR transformation failed: {e}")
+#         return False, "XOR transformation failed."
+
+#     # Step 3: Extract roll number based on the known positions in the mixed string
+#     positions = [2, 5, 8, 11, 14, 17, 20, 23, 26]  # Fixed positions
+#     mixed = list(mixed_string)
+#     print(f"Mixed list: {mixed}")
+
+#     # Extract roll number
+#     extracted_roll_number = ''.join(mixed[pos] for pos in positions)
+#     print(f"Extracted roll number: {extracted_roll_number}")
+
+#     # Remove roll number from the mixed string to reconstruct the secret key
+#     for pos in reversed(positions):  # Remove in reverse order to avoid index shifts
+#         del mixed[pos]
+#     reconstructed_secret_key = ''.join(mixed)
+#     print(f"Reconstructed secret key (after removal of roll number): {reconstructed_secret_key}")
+
+#     try:
+#         roll_number_column = login_sheet.col_values(1)  # Assuming "RollNumber" is in the first column
+#         #print(f"Roll number column: {roll_number_column}")
+        
+#         if extracted_roll_number in roll_number_column:
+#             row_index = roll_number_column.index(extracted_roll_number) + 1  # Add 1 for 1-based indexing
+#             token_column_index = login_sheet.row_values(1).index("Token") + 1  # Find "Token" column index
+#             print(f"Token column index: {token_column_index}")
+
+#             token = login_sheet.cell(row_index, token_column_index).value
+#             print(f"Token found: {token}")
+
+#             if token == encoded_signature:
+#                 print("Signature verification passed.")
+#                 return True
+#         else:
+#             return False, "Roll number not found."
+#     except Exception as e:
+#         return False, f"Error: {e}"
+
+def verify_request_signature(valid_roll_number):
     """Verify the request's Authorization signature using the secret key."""
     received_signature = request.headers.get('Authorization', '').replace('Bearer ', '').strip()
-    print("received signature: ", received_signature)
+    # print("Received signature: ", received_signature)
 
     if not received_signature:
-        return jsonify({'success': False, 'message': 'Out of your scope'}), 401
+        return jsonify({'success': False, 'message': 'Authorization header missing or invalid'}), 401
+    
+    try:
+        token_column = login_sheet.col_values(6)  # Assuming "Token" is in column 6
+        #print(f"Token column: {token_column}")
+        
+        if received_signature in token_column:
+            row_index = token_column.index(received_signature) + 1  # 1-based indexing for rows
+            old_rollno_column_index = 1  # Assuming "RollNumber" is in column 1
+            new_rollno_column_index = 2  # Assuming "NewRollNumber" is in column 2
 
-    expected_signature = generate_server_signature()
-    print("expected signature: ", expected_signature)
+            old_roll_number = login_sheet.cell(row_index, old_rollno_column_index).value.lower()
+            # print(f"Old Roll Number found: {old_roll_number}")
 
-    if not hmac.compare_digest(received_signature, expected_signature):
-        return jsonify({'success': False, 'message': 'Invalid Signature'}), 401
+            new_roll_number = login_sheet.cell(row_index, new_rollno_column_index).value.lower()
+            # print(f"New Roll Number found: {new_roll_number}")
 
-    return None  # Means verification passed
+            if old_roll_number == valid_roll_number.lower() or new_roll_number == valid_roll_number.lower():
+                # print("Signature verification passed.")
+                return None  # Verification successful; no error response
+        return jsonify({'success': False, 'message': 'Signature verification failed'}), 403
+    except Exception as e:
+        # print(f"Error during signature verification: {e}")
+        return jsonify({'success': False, 'message': f'Error during verification: {str(e)}'}), 500
+
+    
+    # decoded_received_signature = decode_signature(received_signature, SECRET_KEY)
+
+    # # expected_signature = SECRET_KEY
+    # # print("expected signature: ", expected_signature)
+
+    # if decoded_received_signature == "False":
+    #     print("Signature verification failed.")
+    #     return jsonify({'success': False, 'message': 'Invalid Signature'}), 401
+
+    # print("Signature verification passed.")
+    # return None  # Means verification passed
+
+
+
 def check_date_overlap(roll_number, new_out_date, new_in_date):
     existing_requests = [
         record for record in requests_sheet.get_all_records()
@@ -92,7 +176,7 @@ def check_date_overlap(roll_number, new_out_date, new_in_date):
 @app.route('/requests/<roll_number>', methods=['GET'])
 @limiter.limit("20 per minute")
 def get_requests(roll_number):
-    verification_response = verify_request_signature()
+    verification_response = verify_request_signature(roll_number)
     if verification_response:
         return verification_response 
     
@@ -123,7 +207,7 @@ def get_requests(roll_number):
 @limiter.limit("10 per minute")
 def get_past_requests(roll_number):
     #print(roll_number)
-    verification_response = verify_request_signature()
+    verification_response = verify_request_signature(roll_number)
     if verification_response:
         return verification_response 
     
@@ -154,7 +238,8 @@ def get_past_requests(roll_number):
 @app.route('/student_details/<roll_number>', methods=['GET'])
 @limiter.limit("20 per minute")
 def student_details(roll_number):
-    verification_response = verify_request_signature()
+    # print(roll_number)
+    verification_response = verify_request_signature(roll_number)
     if verification_response:
         return verification_response 
     
@@ -179,13 +264,15 @@ def student_details(roll_number):
 @app.route('/new_request_local', methods=['POST'])
 @limiter.limit("10 per minute")
 def new_request_local():
-    data = request.get_json()   
+    data = request.get_json() 
+    
+    roll_number = data.get('RollNumber')
+
      # Step 1: Verify Signature
-    verification_response = verify_request_signature()
+    verification_response = verify_request_signature(roll_number)
     if verification_response:
         return verification_response  
 
-    roll_number = data.get('RollNumber')
     name = data.get('Name')
     batch = data.get('Batch')
     #hostel_name = data.get('HostelName')
@@ -260,11 +347,13 @@ def new_request_local():
 @limiter.limit("10 per minute")
 def new_request_outstation():
     data = request.get_json()
-    verification_response = verify_request_signature()
+
+    roll_number = data.get('RollNumber')
+
+    verification_response = verify_request_signature(roll_number)
     if verification_response:
         return verification_response 
     
-    roll_number = data.get('RollNumber')
     name = data.get('Name')
     batch = data.get('Batch')
     #hostel_name = data.get('HostelName')
@@ -332,10 +421,6 @@ def new_request_outstation():
 @app.route('/delete_request/<int:request_id>', methods=['DELETE'])
 @limiter.limit("5 per minute")
 def delete_request(request_id):
-    verification_response = verify_request_signature()
-    if verification_response:
-        return verification_response 
-    
     try:      
         records = requests_sheet.get_all_records()
 
@@ -343,10 +428,15 @@ def delete_request(request_id):
         for idx, record in enumerate(records):
             if record.get("RequestID") == request_id: 
                 row_index = idx + 2
+                roll_number = record.get("RollNumber")
                 break
 
         if row_index is None:
             return jsonify({'success': False, 'message': 'Request ID not found'}), 404
+        
+        verification_response = verify_request_signature(roll_number)
+        if verification_response:
+            return verification_response 
 
         requests_sheet.delete_rows(row_index)
 
@@ -360,9 +450,6 @@ def delete_request(request_id):
 def update_in_date():
     try:
         data = request.json
-        verification_response = verify_request_signature()
-        if verification_response:
-            return verification_response 
     
         request_id = data.get('request_id')
         new_in_date = data.get('in_date') 
@@ -379,6 +466,12 @@ def update_in_date():
 
         if row_idx is None:
             return jsonify({'error': 'Request not found'}), 404
+        
+        roll_number = records[row_idx].get('RollNumber')
+
+        verification_response = verify_request_signature(roll_number)
+        if verification_response:
+            return verification_response 
 
         in_date_col = 7
         requests_sheet.update_cell(row_idx + 2, in_date_col, new_in_date)  # Ensure correct row index
@@ -393,12 +486,13 @@ def update_in_date():
 def check_in_date_single():
     try:
         data = request.get_json()
-        verification_response = verify_request_signature()
+
+        roll_number = data.get('roll_number')
+        # print(f"Received RollNumber: {roll_number}")
+
+        verification_response = verify_request_signature(roll_number)
         if verification_response:
             return verification_response 
-        
-        roll_number = data.get('roll_number')
-        print(f"Received RollNumber: {roll_number}")
 
         if not roll_number:
             return jsonify({'success': False, 'message': 'RollNumber is missing'}), 400
@@ -421,9 +515,7 @@ def check_in_date_single():
 def update_request():
     try:
         data = request.json
-        verification_response = verify_request_signature()
-        if verification_response:
-            return verification_response 
+
         request_id = data.get('request_id')
         new_in_date_str = data.get('in_date')  # Ensure correct key
         locality_area = data.get('locality')
@@ -456,6 +548,15 @@ def update_request():
 
         if row_idx is None:
             return jsonify({'error': 'Request not found'}), 404
+        
+        # print(row_idx)
+        
+        roll_number = records[row_idx].get('RollNumber')
+        # print(roll_number)
+
+        verification_response = verify_request_signature(roll_number)
+        if verification_response:
+            return verification_response 
 
         # Define column indices based on your sheet structure
         status_col = 5
@@ -481,7 +582,7 @@ def update_request():
 
         return jsonify({'success': True, 'message': 'Request updated successfully'})
     except Exception as e:
-        #print(f"Error occurred: {e}")
+        # print(f"Error occurred: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
 #GUARD
