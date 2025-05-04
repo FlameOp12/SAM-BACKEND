@@ -52,7 +52,7 @@ def log_ip_address(app):
     @app.before_request
     def log_client_ip():
         client_ip = request.remote_addr
-        print(f"Client IP Address: {client_ip}")
+        # print(f"Client IP Address: {client_ip}")
 
 log_ip_address(app)
 
