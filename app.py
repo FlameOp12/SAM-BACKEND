@@ -59,7 +59,7 @@ log_ip_address(app)
 limiter = Limiter(
     app=app,
     key_func=get_remote_address,
-    default_limits=["70 per day"],
+    # default_limits=["70 per day"],
     storage_uri="redis://127.0.0.1:6379/0"  # Localhost since Flask is on the same server
 )
 
